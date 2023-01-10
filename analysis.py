@@ -4,20 +4,26 @@ import numpy as np
 from collections import Counter
 
 
-def normalize_over_sum(network_params, sort_by):
+def z_normalize(network_params, sort_by, exclude=None):
     """
-    Return a dataframe of values in @network_params, normalized to [0,1] over
-      the sum of each respective feature
-    :param network_params: DataFrame of non-negative numerical values
+    Z-score normalize numeric values in dataframe
+    :param network_params: DataFrame
     :param sort_by: features to sort the normalized dataframe by
+    :param exclude: columns to exclude from normalizing
     :return: DataFrame
     """
-    if not isinstance(sort_by, list):
-        sort_by = list(sort_by)
+    if exclude is None:
+        exclude = set()
+
+    # Non-numeric columns have dtype of 'object' -> 'O'; apply normalization
+    #   to numeric columns, not labeled for exclusion
+    of_interest = lambda x: (x.dtype != 'O') and (x.name not in exclude)
 
     normd = network_params.apply(
-        lambda x: x / sum(x), axis=0).sort_values(
-            by=sort_by, axis=0, ascending=False)
+        lambda x: (x - x.mean())/x.std() if of_interest(x) else x,
+        axis=0
+    ).sort_values(by=sort_by, axis=0, ascending=False)
+
     return normd
 
 
