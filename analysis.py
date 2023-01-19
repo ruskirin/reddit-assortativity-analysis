@@ -4,6 +4,10 @@ import numpy as np
 from collections import Counter
 
 
+def cosine_similarity(graphs, out=False):
+    pass
+
+
 def z_normalize(network_params, sort_by, exclude=None):
     """
     Z-score normalize numeric values in dataframe
