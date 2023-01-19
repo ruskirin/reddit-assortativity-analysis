@@ -4,8 +4,28 @@ import numpy as np
 from collections import Counter
 
 
-def cosine_similarity(graphs, out=False):
-    pass
+def cosine_similarity(graph, out=False):
+    """
+    Get a dataframe of in/out cosine similarities of a directed graph
+    :param graph: nx.DiGraph
+    :param out: whether to get the out cosine similarity
+    """
+    adj = nx.adjacency_matrix(graph).toarray()
+    # dot multiplication depends on whether to get common in- or out-nodes
+    common_neighbors = pd.DataFrame(adj.dot(adj.T) if out else adj.T.dot(adj),
+                                    index=graph.nodes(),
+                                    columns=graph.nodes())
+
+    deg = list(dict(graph.out_degree() if out else graph.in_degree())
+               .values())
+    deg = np.reshape(deg, (-1,1))
+    geometric_distance = pd.DataFrame(np.sqrt(deg.dot(deg.reshape(1,-1))),
+                                      index=graph.nodes(),
+                                      columns=graph.nodes())
+
+    s = (common_neighbors / geometric_distance).fillna(0).to_numpy()
+    sim = pd.DataFrame(np.triu(s, 1), index=graph.nodes(), columns=graph.nodes())
+    return sim
 
 
 def z_normalize(network_params, sort_by, exclude=None):
