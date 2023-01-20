@@ -5,6 +5,37 @@ from time import time
 from collections import Counter
 
 
+def cosine_similarity_alt(graph, out=False):
+    """
+    Alternative calculation of cosine similarity, returning dataframe of nodes
+      with non-zero similarity values. Should be faster since there is a condition
+      check for zero degree before computing the adjacency dot product.
+    """
+    # dropping nodes of degree 0 but passed graph is mutable so need a deepcopy
+    g = graph.copy()
+    deg_zero = [n for n,d in g.out_degree() if d == 0] if out \
+        else [n for n,d in g.in_degree() if d == 0]
+    g.remove_nodes_from(deg_zero)
+
+    print(f'Dropping nodes: {deg_zero}')
+
+    adj = nx.adjacency_matrix(g).toarray()
+    # dot multiplication depends on whether to get common in- or out-nodes
+    common_neighbors = adj.dot(adj.T) if out else adj.T.dot(adj)
+
+    deg = list(dict(g.out_degree() if out else g.in_degree()).values())
+    deg = np.reshape(deg, (-1, 1)) # Is initially of shape [n, 0]
+    geometric_distance = np.sqrt(deg.dot(deg.reshape(1, -1)))
+
+    s = np.nan_to_num(np.divide(common_neighbors, geometric_distance))
+    np.fill_diagonal(s, 0.0)
+
+    df = pd.DataFrame(0.0, index=graph.nodes(), columns=graph.nodes())
+    df.update(pd.DataFrame(s, index=g.nodes(), columns=g.nodes()))
+
+    return df
+
+
 def cosine_similarity(graph, out=False):
     """
     Get a dataframe of in/out cosine similarities of a directed graph
