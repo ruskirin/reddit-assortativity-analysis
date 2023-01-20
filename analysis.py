@@ -1,6 +1,7 @@
 import pandas as pd
 import networkx as nx
 import numpy as np
+from time import time
 from collections import Counter
 
 
@@ -12,20 +13,17 @@ def cosine_similarity(graph, out=False):
     """
     adj = nx.adjacency_matrix(graph).toarray()
     # dot multiplication depends on whether to get common in- or out-nodes
-    common_neighbors = pd.DataFrame(adj.dot(adj.T) if out else adj.T.dot(adj),
-                                    index=graph.nodes(),
-                                    columns=graph.nodes())
+    common_neighbors = adj.dot(adj.T) if out else adj.T.dot(adj)
 
     deg = list(dict(graph.out_degree() if out else graph.in_degree())
                .values())
-    deg = np.reshape(deg, (-1,1))
-    geometric_distance = pd.DataFrame(np.sqrt(deg.dot(deg.reshape(1,-1))),
-                                      index=graph.nodes(),
-                                      columns=graph.nodes())
+    deg = np.reshape(deg, (-1, 1)) # Is initially of shape [n, 0]
+    geometric_distance = np.sqrt(deg.dot(deg.reshape(1, -1)))
 
-    s = (common_neighbors / geometric_distance).fillna(0).to_numpy()
-    sim = pd.DataFrame(np.triu(s, 1), index=graph.nodes(), columns=graph.nodes())
-    return sim
+    s = np.divide(common_neighbors, geometric_distance)
+    np.fill_diagonal(s, 0)
+
+    return pd.DataFrame(s, index=graph.nodes(), columns=graph.nodes()).fillna(0)
 
 
 def z_normalize(network_params, sort_by, exclude=None):
