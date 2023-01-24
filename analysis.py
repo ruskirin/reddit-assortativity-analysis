@@ -5,56 +5,78 @@ from time import time
 from collections import Counter
 
 
-def cosine_similarity_alt(graph, out=False):
+# def cosine_similarity_alt(graph, out=False):
+#     """
+#     TODO: GIVES INACCURATE MEASUREMENTS!
+#       Removing nodes with in/out degree 0 => removing out/in edges that do
+#       come from/to them, meaning that similarity measures of other nodes are also
+#       affected. Instead of creating a new graph with those nodes removed,
+#       specifically give a similarity score of 0 to the appropriate nodes without
+#       modifying the graph structure itself.
+#
+#     Alternative calculation of cosine similarity, returning dataframe of nodes
+#       with non-zero similarity values. Should be faster since there is a condition
+#       check for zero degree before computing the adjacency dot product.
+#     """
+#     # dropping nodes of degree 0 but passed graph is mutable so need a deepcopy
+#     g = graph.copy()
+#     deg_zero = [n for n,d in g.out_degree() if d == 0] if out \
+#         else [n for n,d in g.in_degree() if d == 0]
+#     g.remove_nodes_from(deg_zero)
+#
+#     print(f'Dropping nodes: {deg_zero}')
+#
+#     adj = nx.adjacency_matrix(g).toarray()
+#     # dot multiplication depends on whether to get common in- or out-nodes
+#     common_neighbors = adj.dot(adj.T) if out else adj.T.dot(adj)
+#
+#     deg = list(dict(g.out_degree() if out else g.in_degree()).values())
+#     deg = np.reshape(deg, (-1, 1)) # Is initially of shape [n, 0]
+#     geometric_distance = np.sqrt(deg.dot(deg.reshape(1, -1)))
+#
+#     s = np.nan_to_num(np.divide(common_neighbors, geometric_distance))
+#     np.fill_diagonal(s, 0.0)
+#
+#     df = pd.DataFrame(0.0, index=graph.nodes(), columns=graph.nodes())
+#     df.update(pd.DataFrame(s, index=g.nodes(), columns=g.nodes()))
+#
+#     return df
+
+
+def node_mean_cosine_similarity(graph, out=False):
     """
-    Alternative calculation of cosine similarity, returning dataframe of nodes
-      with non-zero similarity values. Should be faster since there is a condition
-      check for zero degree before computing the adjacency dot product.
-    """
-    # dropping nodes of degree 0 but passed graph is mutable so need a deepcopy
-    g = graph.copy()
-    deg_zero = [n for n,d in g.out_degree() if d == 0] if out \
-        else [n for n,d in g.in_degree() if d == 0]
-    g.remove_nodes_from(deg_zero)
-
-    print(f'Dropping nodes: {deg_zero}')
-
-    adj = nx.adjacency_matrix(g).toarray()
-    # dot multiplication depends on whether to get common in- or out-nodes
-    common_neighbors = adj.dot(adj.T) if out else adj.T.dot(adj)
-
-    deg = list(dict(g.out_degree() if out else g.in_degree()).values())
-    deg = np.reshape(deg, (-1, 1)) # Is initially of shape [n, 0]
-    geometric_distance = np.sqrt(deg.dot(deg.reshape(1, -1)))
-
-    s = np.nan_to_num(np.divide(common_neighbors, geometric_distance))
-    np.fill_diagonal(s, 0.0)
-
-    df = pd.DataFrame(0.0, index=graph.nodes(), columns=graph.nodes())
-    df.update(pd.DataFrame(s, index=g.nodes(), columns=g.nodes()))
-
-    return df
-
-
-def cosine_similarity(graph, out=False):
-    """
-    Get a dataframe of in/out cosine similarities of a directed graph
+    Get a dataframe of mean in/out cosine similarities for each node of a
+      directed graph
     :param graph: nx.DiGraph
     :param out: whether to get the out cosine similarity
     """
-    adj = nx.adjacency_matrix(graph).toarray()
+    adj = nx.adjacency_matrix(graph)
     # dot multiplication depends on whether to get common in- or out-nodes
-    common_neighbors = adj.dot(adj.T) if out else adj.T.dot(adj)
+    common_neighbors = (adj.dot(adj.T) if out else adj.T.dot(adj)).toarray()
 
-    deg = list(dict(graph.out_degree() if out else graph.in_degree())
-               .values())
-    deg = np.reshape(deg, (-1, 1)) # Is initially of shape [n, 0]
+    deg = list(
+        dict(graph.out_degree() if out else graph.in_degree()).values()
+    )
+    deg = np.reshape(deg, (-1, 1))  # Is initially of shape [n, 0]
     geometric_distance = np.sqrt(deg.dot(deg.reshape(1, -1)))
 
-    s = np.divide(common_neighbors, geometric_distance)
+    # @out specifies array on which to map the division
+    # @where is a boolean array indexing where to apply output of division
+    s = np.divide(common_neighbors,
+                  geometric_distance,
+                  out=np.zeros(common_neighbors.shape),
+                  where=(geometric_distance != 0.0)
+                  )
     np.fill_diagonal(s, 0)
 
-    return pd.DataFrame(s, index=graph.nodes(), columns=graph.nodes()).fillna(0)
+    return pd.DataFrame(s, index=graph.nodes(), columns=graph.nodes()).mean()
+
+
+def graph_mean_cosine_similarity(graphs, out=False):
+    """Get the mean cosine similarity for each graph in graphs; graphs must be
+    a dictionary of {graph name: networkx.DiGraph} pairs"""
+    mean_csim = {n: node_mean_cosine_similarity(g, out).mean() for n,g in graphs.items()}
+    return pd.Series(mean_csim, name='mean_cos_sim')
 
 
 def z_normalize(network_params, sort_by, exclude=None):
@@ -181,7 +203,7 @@ def get_graph_reciprocity(graphs):
     return pd.Series(recip, name='reciprocity')
 
 
-def get_graph_base_stats(graphs):
+def get_graph_base_stats(graphs, cos_sim_out=False):
     strongest_comps = get_subset_strongly_conn_components(graphs, True)
 
     nodes_edges = get_graph_nodes_edges(graphs)
@@ -190,10 +212,11 @@ def get_graph_base_stats(graphs):
     num_pct_deg_one = get_graph_amt_nodes_deg_one(graphs, nodes_edges['nodes'])
     pagerank_max_avg = get_pagerank_max_avg(graphs)
     recip = get_graph_reciprocity(graphs)
+    similarity = graph_mean_cosine_similarity(graphs, cos_sim_out)
 
     return pd.concat(
         [nodes_edges, density, num_pct_strongest, num_pct_deg_one,
-         pagerank_max_avg, recip],
+         pagerank_max_avg, recip, similarity],
         axis=1)
 
 
