@@ -127,7 +127,7 @@ def get_subset_strongly_conn_components(graphs, largest=False):
     :param graphs: {subreddit: networkx graph} dictionary
     :param largest: if True return only largest strongly-connected component
     :return: dict of {subreddit: [strongly-connected components]
-      OR largest strongly-connected component}
+      OR set(largest strongly-connected component)}
     """
     comps = {n: list(sorted(nx.strongly_connected_components(g), key=len, reverse=True))
              for n,g in graphs.items()}
@@ -150,6 +150,21 @@ def get_graph_amt_nodes_largest_strong_comp(strongest_comps, node_count):
         [pd.Series(count_strongest, name='nodes_largest_strong_comp'),
          pd.Series(pct_strongest, name='pct_nodes_largest_strong_comp')],
         axis=1)
+
+
+def graph_strongest_vs_not_assortativity(graphs):
+    group_nodes = {n: set(g.nodes()) for n, g in graphs.items()}
+    group_strongest = get_subset_strongly_conn_components(graphs, True)
+    group_outsiders = {
+        sr: nodes.difference(group_strongest[sr]) for sr, nodes in
+        group_nodes.items()
+    }
+
+    modularities = {
+        n: nx.algorithms.community.quality.modularity(
+            g, [group_strongest[n], group_outsiders[n]]) for n, g in graphs.items()
+    }
+    return pd.Series(modularities, name='modularity')
 
 
 def get_digraph_deg_distrib(graphs):
@@ -213,10 +228,11 @@ def get_graph_base_stats(graphs, cos_sim_out=False):
     pagerank_max_avg = get_pagerank_max_avg(graphs)
     recip = get_graph_reciprocity(graphs)
     similarity = graph_mean_cosine_similarity(graphs, cos_sim_out)
+    modularity = graph_strongest_vs_not_assortativity(graphs)
 
     return pd.concat(
         [nodes_edges, density, num_pct_strongest, num_pct_deg_one,
-         pagerank_max_avg, recip, similarity],
+         pagerank_max_avg, recip, similarity, modularity],
         axis=1)
 
 
