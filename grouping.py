@@ -1,7 +1,13 @@
 import numpy as np
 import pyperclip
+from collections import defaultdict
+from copy import deepcopy
 import ast
+import files
+import logging
 
+
+logger = logging.getLogger(__name__)
 
 CATEGORIES = {'sports','food','geography','market','philosophy','animals',
               'sexual','violent','books_comics','q_and_a','hobbies','media',
@@ -9,6 +15,70 @@ CATEGORIES = {'sports','food','geography','market','philosophy','animals',
               'stories','education','travel','religion','personal','vehicles',
               'comedy','medical','news','politics','fashion','professional',
               'other'}
+
+
+def get_missing_added_changed(original: set, groups: dict):
+    """
+    Check for missing, added, and misspelled subreddits. ChatGPT has a tendency
+      to "correct" the spelling of inputs without being asked to.
+    """
+    true_miss, false_miss = get_missing(original, groups)
+    true_add, false_add = get_added(original, groups)
+
+    logger.debug(true_add, '\n', true_miss)
+
+    # merge @false_miss, @false_add
+    diff = set(false_miss.keys()).difference(set(false_add.keys())) # get keys in @false_miss not in @false_add
+    changed = deepcopy(false_add)
+    changed.update({d: false_miss[d] for d in diff})
+
+    return true_miss, true_add, changed
+
+
+def get_missing(original: set, groups: dict) -> (set,dict):
+    """Get all subreddits in @groups that are missing from @original"""
+    processed = get_grouped_subreddits(groups)
+
+    # some subreddits only have variation in capitalization, want to make sure
+    #   they don't mistakenly get ignored
+    nproc = {p.lower() for p in processed}
+    norig = defaultdict(set)
+    for o in original:
+        norig[o.lower()].add(o)
+
+    missing = {(m, m.lower()) for m in original.difference(processed)}
+    true_miss = set() # actually missing subreddits
+    false_miss = dict() # subreddits with changed capitalization
+    for text, norm in missing:
+        if norm not in nproc:
+            true_miss.add(text)
+        else:
+            false_miss[text] = norig[norm]
+
+    return true_miss, false_miss
+
+
+def get_added(original: set, groups: dict) -> (set,dict):
+    """
+    Get all subreddits extra elements of @groups that aren't present in
+      @original
+    """
+    processed = get_grouped_subreddits(groups)
+
+    # some subreddits only have variation in capitalization, want to make sure
+    #   they don't mistakenly get ignored
+    norig = defaultdict(set)
+    for o in original:
+        norig[o.lower()].add(o)
+
+    added = {(a, a.lower()) for a in original.difference(processed)}
+    true_add = set()
+    false_add = dict()
+    for text, norm in added:
+        if norm not in norig.keys():
+            true_add.add(text)
+        else:
+            false_add[text] = norig[norm]
 
 
 def get_uncategorized(groups: dict):
@@ -107,15 +177,11 @@ def format_query(categories, chunk):
            f'subreddits: {chunk}')
 
 
-def get_missing_and_added(original: set, processed: set):
-    miss = original.difference(processed)
-    added = processed.difference(original)
-
-    return miss, added
-
-
 def batch_list(data, batches=None, batch_size=None):
-    """Batch @data into a specific amount of @batches or by @batch_size"""
+    """
+    Batch @data into a specific amount of @batches or by @batch_size. Used in
+      creating smaller queries to avoid ChatGPT limit
+    """
     if batches is None and batch_size is None:
         return data
 
@@ -139,7 +205,7 @@ def batch_list(data, batches=None, batch_size=None):
     return bs
 
 
-def get_grouped_subreddits(groups: dict):
+def get_grouped_subreddits(groups: dict) -> set:
     """Return a set of all subreddits that are in @groups"""
     srs = set()
     for g in groups.values():

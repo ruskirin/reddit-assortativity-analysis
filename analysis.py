@@ -1,46 +1,58 @@
 import pandas as pd
 import networkx as nx
 import numpy as np
+import json
 from time import time
 from collections import Counter
 
 
-# def cosine_similarity_alt(graph, out=False):
-#     """
-#     TODO: GIVES INACCURATE MEASUREMENTS!
-#       Removing nodes with in/out degree 0 => removing out/in edges that do
-#       come from/to them, meaning that similarity measures of other nodes are also
-#       affected. Instead of creating a new graph with those nodes removed,
-#       specifically give a similarity score of 0 to the appropriate nodes without
-#       modifying the graph structure itself.
+def nx_digraph_from_path(name, path):
+    """Extract json data from @path and return its (name, nx.DiGraph) tuple"""
+    try:
+        with open(path) as f:
+            js = json.load(f)
+
+            # Merge the dictionaries representing a single subreddit
+            data_dict = dict()
+            for j in js:
+                data_dict.update(j)
+
+            graph = nx.DiGraph(data_dict)
+            return name, graph
+    except nx.NetworkXError as ne:
+        print(ne)
+        return None
+
+    except ValueError as je:
+        print(je)
+        return None
+
+
+# def gt_digraph_from_path(path):
+#     try:
+#         with open(path) as f:
+#             js = json.load(f)
 #
-#     Alternative calculation of cosine similarity, returning dataframe of nodes
-#       with non-zero similarity values. Should be faster since there is a condition
-#       check for zero degree before computing the adjacency dot product.
-#     """
-#     # dropping nodes of degree 0 but passed graph is mutable so need a deepcopy
-#     g = graph.copy()
-#     deg_zero = [n for n,d in g.out_degree() if d == 0] if out \
-#         else [n for n,d in g.in_degree() if d == 0]
-#     g.remove_nodes_from(deg_zero)
+#             # graph-tool and igraph do not take string nodes; using UniqueIdGenerator
+#             #   from igraph to create a mapping of usernames to unique integers
+#             id_map = UniqueIdGenerator()
+#             data_dict = dict()
+#             for j in js:
+#                 data_dict.update(j)
 #
-#     print(f'Dropping nodes: {deg_zero}')
+#             edges = {(id_map[x], id_map[y]) for x in data_dict for y in
+#                      data_dict[x]}
+#             # Get dictionary of {node id: node name}
+#             id_map = id_map.reverse_dict()
 #
-#     adj = nx.adjacency_matrix(g).toarray()
-#     # dot multiplication depends on whether to get common in- or out-nodes
-#     common_neighbors = adj.dot(adj.T) if out else adj.T.dot(adj)
+#             g = Graph(directed=True)
+#             g.add_edge_list(edges)
 #
-#     deg = list(dict(g.out_degree() if out else g.in_degree()).values())
-#     deg = np.reshape(deg, (-1, 1)) # Is initially of shape [n, 0]
-#     geometric_distance = np.sqrt(deg.dot(deg.reshape(1, -1)))
+#             return g
 #
-#     s = np.nan_to_num(np.divide(common_neighbors, geometric_distance))
-#     np.fill_diagonal(s, 0.0)
-#
-#     df = pd.DataFrame(0.0, index=graph.nodes(), columns=graph.nodes())
-#     df.update(pd.DataFrame(s, index=g.nodes(), columns=g.nodes()))
-#
-#     return df
+#     except ValueError as je:
+#         print(je)
+#         return None
 
 
 def node_mean_cosine_similarity(graph, out=False):
@@ -266,3 +278,42 @@ def get_p_value(params, samples, field):
         p_vals[sr] = portion/1000
 
     return p_vals
+
+
+
+# def cosine_similarity_alt(graph, out=False):
+#     """
+#     TODO: GIVES INACCURATE MEASUREMENTS!
+#       Removing nodes with in/out degree 0 => removing out/in edges that do
+#       come from/to them, meaning that similarity measures of other nodes are also
+#       affected. Instead of creating a new graph with those nodes removed,
+#       specifically give a similarity score of 0 to the appropriate nodes without
+#       modifying the graph structure itself.
+#
+#     Alternative calculation of cosine similarity, returning dataframe of nodes
+#       with non-zero similarity values. Should be faster since there is a condition
+#       check for zero degree before computing the adjacency dot product.
+#     """
+#     # dropping nodes of degree 0 but passed graph is mutable so need a deepcopy
+#     g = graph.copy()
+#     deg_zero = [n for n,d in g.out_degree() if d == 0] if out \
+#         else [n for n,d in g.in_degree() if d == 0]
+#     g.remove_nodes_from(deg_zero)
+#
+#     print(f'Dropping nodes: {deg_zero}')
+#
+#     adj = nx.adjacency_matrix(g).toarray()
+#     # dot multiplication depends on whether to get common in- or out-nodes
+#     common_neighbors = adj.dot(adj.T) if out else adj.T.dot(adj)
+#
+#     deg = list(dict(g.out_degree() if out else g.in_degree()).values())
+#     deg = np.reshape(deg, (-1, 1)) # Is initially of shape [n, 0]
+#     geometric_distance = np.sqrt(deg.dot(deg.reshape(1, -1)))
+#
+#     s = np.nan_to_num(np.divide(common_neighbors, geometric_distance))
+#     np.fill_diagonal(s, 0.0)
+#
+#     df = pd.DataFrame(0.0, index=graph.nodes(), columns=graph.nodes())
+#     df.update(pd.DataFrame(s, index=g.nodes(), columns=g.nodes()))
+#
+#     return df
