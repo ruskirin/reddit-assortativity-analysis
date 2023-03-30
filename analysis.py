@@ -6,7 +6,7 @@ from time import time
 from collections import Counter
 
 
-def nx_digraph_from_path(name, path):
+def nx_digraph_from_path(name, path) -> (str, nx.DiGraph):
     """Extract json data from @path and return its (name, nx.DiGraph) tuple"""
     try:
         with open(path) as f:

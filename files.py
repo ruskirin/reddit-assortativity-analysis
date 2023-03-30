@@ -4,11 +4,11 @@ import json
 
 PATH_DATA = Path('data')
 PATH_NET = PATH_DATA/'chain-networks'
-PATH_GROUPS = PATH_DATA/'subreddits_grouped.json'
+PATH_GROUPS = PATH_DATA/'subreddits-grouped.json'
 
 
-def get_network_paths_grouped() -> dict:
-    groups = get_groups()
+def get_network_paths_grouped(path_groups=None) -> dict:
+    groups = get_groups(path_groups)
     paths = get_network_paths()
     ns = dict()
 
@@ -28,9 +28,9 @@ def get_network_paths() -> dict:
     return sr
 
 
-def get_groups() -> dict:
+def get_groups(path=None) -> dict:
     """Get the json file with dict of subreddit groupings"""
-    with open(PATH_GROUPS, 'r') as f:
+    with open(PATH_GROUPS if path is None else path, 'r') as f:
         groups = json.load(f)
 
     return groups
