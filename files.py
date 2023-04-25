@@ -3,6 +3,7 @@ import json
 
 
 PATH_DATA = Path('data')
+PATH_IMG = Path('images')
 PATH_NET = PATH_DATA/'chain-networks'
 PATH_GROUPS = PATH_DATA/'subreddits-grouped.json'
 

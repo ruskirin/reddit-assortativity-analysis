@@ -1,0 +1,21 @@
+name: reddit_assort 
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - gcc
+  - pandas
+  - matplotlib 
+  - networkx
+  - seaborn
+  - notebook
+  - regex
+  - numpy
+  - scipy
+  - scikit-learn
+  - numexpr
+  - openblas
+  - libblas=*=*openblas
+  - openpyxl
+  - pytest
